@@ -259,6 +259,40 @@ class TestModelsResponseActiveProfile:
         assert entry["settings"]["active_profile_name"] == "coding"
 
 
+class TestSpeculativeSettingsValidation:
+    def test_rejects_specprefill_and_dflash_overlap(self, client):
+        c, mgr = client
+        r = c.put("/admin/api/models/model-a/settings", json={
+            "specprefill_enabled": True,
+            "dflash_enabled": True,
+            "dflash_draft_model": "z-lab/Qwen3.5-4B-DFlash",
+        })
+        assert r.status_code == 400
+        assert "SpecPrefill and DFlash" in r.json()["detail"]
+
+        settings = mgr.get_settings("model-a")
+        assert settings.specprefill_enabled is False
+        assert settings.dflash_enabled is False
+
+    def test_rejects_enabling_dflash_when_specprefill_already_enabled(self, client):
+        c, mgr = client
+        r = c.put("/admin/api/models/model-a/settings", json={
+            "specprefill_enabled": True,
+            "specprefill_draft_model": "mlx-community/Qwen3-0.6B-4bit",
+        })
+        assert r.status_code == 200
+
+        r = c.put("/admin/api/models/model-a/settings", json={
+            "dflash_enabled": True,
+            "dflash_draft_model": "z-lab/Qwen3.5-4B-DFlash",
+        })
+        assert r.status_code == 400
+
+        settings = mgr.get_settings("model-a")
+        assert settings.specprefill_enabled is True
+        assert settings.dflash_enabled is False
+
+
 class TestActiveProfileDriftClearing:
     def test_active_preserved_when_no_drift(self, client):
         c, mgr = client

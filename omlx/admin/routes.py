@@ -1542,6 +1542,21 @@ async def update_model_settings(
     # Apply updates — use model_fields_set to distinguish "sent as null"
     # (clear to default) from "not sent" (don't touch).
     sent = request.model_fields_set
+    effective_specprefill_enabled = (
+        (request.specprefill_enabled or False)
+        if "specprefill_enabled" in sent
+        else current_settings.specprefill_enabled
+    )
+    effective_dflash_enabled = (
+        (request.dflash_enabled or False)
+        if "dflash_enabled" in sent
+        else current_settings.dflash_enabled
+    )
+    if effective_specprefill_enabled and effective_dflash_enabled:
+        raise HTTPException(
+            status_code=400,
+            detail="SpecPrefill and DFlash cannot both be enabled for the same model.",
+        )
     prev_engine_type = entry.engine_type  # Track for requires_reload check
     if "model_alias" in sent:
         alias_value = request.model_alias.strip() if request.model_alias else None
